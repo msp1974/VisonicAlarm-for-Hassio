@@ -4,18 +4,9 @@ Interfaces with the Visonic Alarm control panel.
 import asyncio
 import logging
 
-from homeassistant.components.alarm_control_panel import AlarmControlPanelEntity
+from homeassistant.components.alarm_control_panel import AlarmControlPanelEntity, AlarmControlPanelState
 from homeassistant.components.alarm_control_panel.const import AlarmControlPanelEntityFeature, CodeFormat
-from homeassistant.const import (
-    CONF_CODE,
-    STATE_ALARM_ARMED_AWAY,
-    STATE_ALARM_ARMED_HOME,
-    STATE_ALARM_ARMING,
-    STATE_ALARM_DISARMED,
-    STATE_ALARM_DISARMING,
-    STATE_ALARM_PENDING,
-    STATE_ALARM_TRIGGERED,
-)
+from homeassistant.const import CONF_CODE
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -124,13 +115,13 @@ class VisonicAlarm(BaseVisonicEntity, AlarmControlPanelEntity, CoordinatorEntity
     @property
     def icon(self):
         """Return icon"""
-        if self._state == STATE_ALARM_ARMED_AWAY:
+        if self._state == AlarmControlPanelState.ARMED_AWAY:
             return "mdi:shield-lock"
-        elif self._state == STATE_ALARM_ARMED_HOME:
+        elif self._state == AlarmControlPanelState.ARMED_HOME:
             return "mdi:shield-home"
-        elif self._state == STATE_ALARM_DISARMED:
+        elif self._state == AlarmControlPanelState.DISARMED:
             return "mdi:shield-check"
-        elif self._state == STATE_ALARM_ARMING:
+        elif self._state == AlarmControlPanelState.ARMING:
             return "mdi:shield-outline"
         else:
             return "hass:bell-ring"
@@ -143,8 +134,8 @@ class VisonicAlarm(BaseVisonicEntity, AlarmControlPanelEntity, CoordinatorEntity
     @property
     def code_format(self) -> CodeFormat | None:
         """Return one or more digits/characters."""
-        if (self.coordinator.pin_required_arm and self._state == STATE_ALARM_DISARMED) or (
-            self.coordinator.pin_required_disarm and self._state in [STATE_ALARM_ARMED_HOME, STATE_ALARM_ARMED_AWAY]
+        if (self.coordinator.pin_required_arm and self._state == AlarmControlPanelState.DISARMED) or (
+            self.coordinator.pin_required_disarm and self._state in [AlarmControlPanelState.ARMED_HOME, AlarmControlPanelState.ARMED_AWAY]
         ):
             return CodeFormat.NUMBER
 
@@ -182,32 +173,32 @@ class VisonicAlarm(BaseVisonicEntity, AlarmControlPanelEntity, CoordinatorEntity
         state = partition_status.state
 
         if self._disarm_in_progress:
-            return STATE_ALARM_DISARMING
+            return AlarmControlPanelState.DISARMING
 
         if self._arm_in_progress:
-            return STATE_ALARM_ARMING
+            return AlarmControlPanelState.ARMING
 
         if status:
             if status == AlarmStatus.EXIT:
-                return STATE_ALARM_ARMING
+                return AlarmControlPanelState.ARMING
             elif status == AlarmStatus.ENTRYDELAY:
-                return STATE_ALARM_PENDING
+                return AlarmControlPanelState.PENDING
             elif status == AlarmStatus.ALARM:
-                return STATE_ALARM_TRIGGERED
+                return AlarmControlPanelState.TRIGGERED
         else:
             if state == AlarmState.AWAY:
-                return STATE_ALARM_ARMED_AWAY
+                return AlarmControlPanelState.ARMED_AWAY
             elif state == AlarmState.HOME:
-                return STATE_ALARM_ARMED_HOME
+                return AlarmControlPanelState.ARMED_HOME
             elif state == AlarmState.DISARM:
-                return STATE_ALARM_DISARMED
+                return AlarmControlPanelState.DISARMED
             elif state == AlarmStatus.ALARM:
-                return STATE_ALARM_TRIGGERED
-            
+                return AlarmControlPanelState.TRIGGERED
+
     @property
     def code_arm_required(self):
         return False
-    
+
     @property
     def supported_features(self) -> int:
         """Return the list of supported features."""
@@ -222,7 +213,7 @@ class VisonicAlarm(BaseVisonicEntity, AlarmControlPanelEntity, CoordinatorEntity
 
             process_token = await self.hass.async_add_executor_job(self._alarm.disarm, self._partition_id)
             self._disarm_in_progress = True
-            self._state = STATE_ALARM_DISARMING
+            self._state = AlarmControlPanelState.DISARMING
             self.async_write_ha_state()
 
             if await self.async_wait_for_process_success(self.coordinator, process_token):
@@ -261,7 +252,7 @@ class VisonicAlarm(BaseVisonicEntity, AlarmControlPanelEntity, CoordinatorEntity
                         )
 
                     self._arm_in_progress = True
-                    self._state = STATE_ALARM_ARMING
+                    self._state = AlarmControlPanelState.ARMING
                     self.async_write_ha_state()
 
                     result = await self.async_wait_for_process_success(self.coordinator, process_token)
